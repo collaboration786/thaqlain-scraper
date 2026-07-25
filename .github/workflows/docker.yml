@@ -67,6 +67,28 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Retry on transient GitHub infrastructure errors.
+          # The build-push-action doesn't have built-in retry, so we rely on
+          # the workflow's retry mechanism via the step below.
+        continue-on-error: true
+        id: build
+
+      - name: Retry build if failed
+        if: steps.build.outcome == 'failure'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Check build result
+        if: steps.build.outcome == 'failure' && steps.build.conclusion == 'failure'
+        run: |
+          echo "Build failed on both attempts"
+          exit 1
 
       - name: Image digest
-        run: echo "Pushed ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} (amd64 + arm64)"
+        run: echo "Pushed ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} — amd64 and arm64"
