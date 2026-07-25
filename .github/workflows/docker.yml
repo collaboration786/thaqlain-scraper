@@ -58,7 +58,7 @@ jobs:
             type=sha,format=short
             type=raw,value={{date 'YYYYMMDD'}}
 
-      - name: Build and push (multi-arch: amd64 + arm64)
+      - name: Build and push multi-arch image
         uses: docker/build-push-action@v6
         with:
           context: .
