@@ -236,17 +236,21 @@ def parse_calendar_html(html, year):
 # ── Main scrape logic ────────────────────────────────────────────────────────
 
 def scrape_all_months(session):
-    """Scrape all 13 months and return deduplicated events."""
+    """Scrape the full current year + next year (24 months) and return deduplicated events."""
     now = time.gmtime()
+    # Scrape Jan-Dec of the current year, plus Jan-Dec of next year.
+    # This gives full-year coverage and updates daily as the scheduler runs.
+    years_to_scrape = [now.tm_year, now.tm_year + 1]
     months = []
-    for i in range(MONTHS_TO_SCRAPE):
-        y = now.tm_year + ((now.tm_mon - 1 + i) // 12)
-        m = ((now.tm_mon - 1 + i) % 12) + 1
-        months.append((y, m))
+    for year in years_to_scrape:
+        for month in range(1, 13):
+            months.append((year, month))
 
     all_events = []
     for year, month in months:
-        url = f"{BASE_URL}/?tribe_events_month={month}&tribe_events_year={year}"
+        # The Events Calendar requires zero-padded month in the URL.
+        # Format: /events/YYYY-MM/ (the canonical TEC month URL)
+        url = f"{BASE_URL}/events/{year}-{month:02d}/"
         print(f"\n  Scraping {year}-{month:02d}...")
 
         try:
@@ -261,6 +265,10 @@ def scrape_all_months(session):
             if resp.status_code != 200:
                 print(f"    HTTP {resp.status_code}, skipping")
                 continue
+
+            # Verify we got the right month (check the page title).
+            if f"{year}-{month:02d}" not in resp.text and f"{month:02d}" not in resp.text:
+                print(f"    ⚠ Page may not be the correct month — check URL format")
 
             events = parse_calendar_html(resp.text, year)
             print(f"    Found {len(events)} events")
