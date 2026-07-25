@@ -1,0 +1,31 @@
+version: "3.8"
+
+# Thaqlain Calendar Scraper — local/dev deployment (builds from source).
+# Use docker-compose.portainer.yml for production (pulls from registry).
+
+services:
+  scraper:
+    build: .
+    image: thaqlain-scraper:local
+    container_name: thaqlain-scraper
+    restart: "no"
+    environment:
+      - WORKER_URL=${WORKER_URL}
+      - WORKER_INGEST_SECRET=${WORKER_INGEST_SECRET}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+
+  scheduler:
+    image: mcuadros/ofelia:latest
+    container_name: thaqlain-scheduler
+    command: daemon --docker
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      ofelia.job-run.thaqlain-scraper.schedule: "@daily"
+      ofelia.job-run.thaqlain-scraper.image: "thaqlain-scraper:local"
+      ofelia.job-run.thaqlain-scraper.command: "python3 scrape_and_push.py"
+    depends_on:
+      - scraper
