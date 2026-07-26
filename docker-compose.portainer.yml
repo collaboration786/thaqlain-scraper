@@ -1,16 +1,15 @@
 version: "3.8"
 
-# Thaqlain Calendar Scraper — Portainer Stack (pulls pre-built image from registry).
+# Thaqlain Scraper — Portainer Stack
 #
-# This compose file pulls the multi-arch image from GitHub Container Registry.
-# Just paste this into Portainer's Stack editor and set the environment vars.
+# Only the scraper runs on Portainer now. The Worker handles push notifications
+# natively using the standard `web-push` npm library (no Python sidecar needed).
 #
-# Image: ghcr.io/<your-github-username>/thaqlain-scraper:latest
-# (Auto-built by GitHub Actions for linux/amd64 AND linux/arm64)
+# Env vars (set in Portainer):
+#   WORKER_URL              — your Cloudflare Worker URL
+#   WORKER_INGEST_SECRET    — shared secret for the API
 
 services:
-  # The scraper runs ONCE (scrape 13 months → push to Worker → exit).
-  # Ofelia (the scheduler) starts it daily via `job-run`.
   scraper:
     image: ghcr.io/collaboration786/thaqlain-scraper:latest
     container_name: thaqlain-scraper
@@ -19,12 +18,8 @@ services:
       - WORKER_URL=${WORKER_URL}
       - WORKER_INGEST_SECRET=${WORKER_INGEST_SECRET}
     volumes:
-      - scraper-logs:/app/logs
-      - scraper-data:/app/data
+      - ./logs:/app/logs
 
-  # Ofelia scheduler — reads job labels via Docker API (`--docker` flag).
-  # The `job-run` labels go HERE (on the scheduler), not on the scraper,
-  # because job-run starts a NEW container from the specified image.
   scheduler:
     image: mcuadros/ofelia:latest
     container_name: thaqlain-scheduler
@@ -33,13 +28,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
-      # Ofelia will start a fresh scraper container daily at midnight.
       ofelia.job-run.thaqlain-scraper.schedule: "@daily"
       ofelia.job-run.thaqlain-scraper.image: "ghcr.io/collaboration786/thaqlain-scraper:latest"
       ofelia.job-run.thaqlain-scraper.command: "python3 scrape_and_push.py"
     depends_on:
       - scraper
-
-volumes:
-  scraper-logs:
-  scraper-data:
